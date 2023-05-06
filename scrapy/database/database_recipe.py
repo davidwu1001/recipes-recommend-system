@@ -1,5 +1,5 @@
-import json
-
+import  json
+from utils.escape import _escape,_unescape
 from py2neo import Graph,NodeMatcher,RelationshipMatcher,Transaction
 import uuid
 graph = Graph("bolt://localhost:7687", auth=("neo4j","11111111w"))
@@ -25,7 +25,7 @@ def Insert(recipe,ingredients,procedures):
             process = recipe["process"]
         else:
             process = ''
-        cypher = f"create (n:Recipe {{id:'{generate_ID()}',name:'{recipe['name']}',picture:'{picture}',time_consuming:'{time_consuming}',process:'{process}',category:{str(recipe['category'])},text:'{recipe['text']}' }}) return n.id as id"
+        cypher = f"create (n:Recipe {{id:'{generate_ID()}',name:'{recipe['name']}',picture:'{picture}',time_consuming:'{time_consuming}',process:'{process}',category:{str(recipe['category'])},text:'{_escape(recipe['text'])}' }}) return n.id as id"
         recipe_id = tx.run(cypher).evaluate("id")
 
         for ingredient in ingredients:
@@ -45,7 +45,7 @@ def Insert(recipe,ingredients,procedures):
             tx.run(cypher)
 
         for procedure in procedures:
-            cypher = f"merge (p:Procedure {{id:'{generate_ID()}',picture:'{procedure['picture']}',text:'{procedure['text']}',seq:'{procedure['seq']}'}})  return p.id as id"
+            cypher = f"merge (p:Procedure {{id:'{generate_ID()}',picture:'{procedure['picture']}',text:'{_escape(procedure['text'])}',seq:'{procedure['seq']}'}})  return p.id as id"
             procedure_id = tx.run(cypher).evaluate("id")
             cypher = f"match (r:Recipe),(p:Procedure) where r.id = '{recipe_id}' and p.id = '{procedure_id}' create (r)-[s:step {{id:'{generate_ID()}'}}]->(p)"
             tx.run(cypher)
@@ -56,10 +56,11 @@ def Insert(recipe,ingredients,procedures):
         raise
 
 def main():
-    with open("../爬取结果/recipes.json",'r') as f:
+    with open("../爬取结果/recipes.json", 'r') as f:
         recipes = json.load(f)[1:]
         for recipe in recipes:
             Insert(recipe['recipe'],recipe['ingredient'],recipe['procedure'])
+
 
 if __name__ == "__main__":
     main()

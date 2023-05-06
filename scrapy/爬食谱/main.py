@@ -20,11 +20,10 @@ def handleUrl(url):
     return handleSoup(soup)
 # 主函数
 def handleRecipe(recipe_nums):
-    recipes = [] #食谱对象容器
+    recipes = []  # 新添加到食谱
     #循环爬取食谱主页
     for item in recipe_nums:
         url = f"https://home.meishichina.com/recipe-{item}.html"
-        print(url)
         recipe = handleUrl(url) #对于每一个url拿到食谱对象
 
         #url有效
@@ -34,6 +33,7 @@ def handleRecipe(recipe_nums):
 
     store_json(recipes) # 加入到json
     store_txt(recipes) # 加入到语料库
+    return len(recipes)
 
 def store_json(recipes):
     #将json字符串写入文件
@@ -76,18 +76,41 @@ def store_txt(recipes):
                 new_line = new_line + ' ' + ingredient['name']
             f.write(new_line+"\n")
         print(f"已写入语料库，目前语料库共有{num}条记录")
-
+def get_state():
+    with open("state.json", 'r+', encoding="utf-8") as f:
+        f.seek(0)
+        state = json.load(f)
+        return state
+def set_state(current_group,total_recipe_num):
+    with open("state.json", 'w') as f:
+        f.write(json.dumps({"current_group":current_group,"total_recipe_num":total_recipe_num}))
+def get_random_num(current_group):
+    with open("random_num.json",'r+') as f:
+        f.seek(0)
+        random_nums = json.load(f)
+        return random_nums[current_group]
 if __name__ == '__main__':
     # 取消http警告
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    nums = list(range(100000, 999999))
-    random_num = random.sample(nums, 10000) # 10000个随机序号
-    for item in range(25): # 分25批爬取，每次间隔1分钟
-        print(f"第{item+1}批正在爬取")
-        start = item*400
-        end = start + 400
-        recipe_nums = random_num[start:end]
-        handleRecipe(recipe_nums)
-        print(f"第{item+1}批爬取完成，系统暂停30秒")
+    while True:
+        # 获取当前状态，读取到了那一组
+        state = get_state()
+        current_group = state['current_group']   # 当前读到了那一组
+        total_recipe_num = state['total_recipe_num']  # 目前爬取的recipe总数
+
+        random_nums = get_random_num(current_group)  # 400个随机序号
+
+        len_new = handleRecipe(random_nums)  # 返回新生成的食谱数量
+
+        current_group = current_group + 1
+        total_recipe_num = total_recipe_num + len_new
+
+        if total_recipe_num >= 10000:  # 一万个食谱，之后结束爬取
+            break
+
+        set_state(current_group,total_recipe_num)
+
+        print(f"第{current_group}批爬取完成，系统暂停30秒")
         time.sleep(30)
+
 

@@ -12,6 +12,7 @@ def handleSoup(soup):
         recipe = {}
         # 食谱名称
         recipe['name'] = soup.find(id="recipe_title").text
+        print("正在爬取：",recipe['name'])
         # 食谱工艺
         if soup.find("span", string="工艺"):
             recipe['process'] = soup.find("span", string="工艺").findParent("li").find("a").text
