@@ -2,7 +2,7 @@ def handleSoup(soup):
     if soup.find("img")['src'] == "//static.meishichina.com/v6/img/temp/404_1.png":
         # 网页不存在
         return False
-    if not soup.find(id="recipe_title").text:
+    if not soup.find(id="recipe_title"):
         #食谱不存在
         return False
     if not soup.find(id="recipe_De_imgBox"):
@@ -12,7 +12,6 @@ def handleSoup(soup):
         recipe = {}
         # 食谱名称
         recipe['name'] = soup.find(id="recipe_title").text
-        print("正在爬取：",recipe['name'])
         # 食谱工艺
         if soup.find("span", string="工艺"):
             recipe['process'] = soup.find("span", string="工艺").findParent("li").find("a").text

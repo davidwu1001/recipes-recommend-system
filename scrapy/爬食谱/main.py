@@ -7,28 +7,42 @@ import json
 import random
 import os
 import urllib3
-
+from faker import Faker
+fake = Faker()
 def handleUrl(url):
+    # 使用faker随机生成user-agent用于反反爬虫
     headers = {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 7_1_2 like Mac OS X) App leWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D257 Safari/9537.53'
+        'User-Agent': fake.user_agent(),
+        'Referer': fake.url(),
+        'Cookie': fake.uuid4()
     }
-    response = requests.get(url, verify=False, headers=headers)
-    response.encoding = "utf-8"
-    html = response.text
-    soup = BeautifulSoup(html, 'html.parser')
 
-    return handleSoup(soup)
+    # 排除代理错误的情况 也就是被美食天下ban了
+    try:
+        response = requests.get(url, verify=False, headers=headers)
+        response.encoding = "utf-8"
+        html = response.text
+        soup = BeautifulSoup(html, 'html.parser')
+        return handleSoup(soup)
+    except requests.exceptions.ProxyError as e:
+        print("代理错误：", e)
+        return {}
+        # 处理代理错误的情况
+    except requests.exceptions.RequestException as e:
+        print("请求错误：", e)
+        return {}
 # 主函数
 def handleRecipe(recipe_nums):
     recipes = []  # 新添加到食谱
     #循环爬取食谱主页
-    for item in recipe_nums:
+    for idx,item in enumerate(recipe_nums):
         url = f"https://home.meishichina.com/recipe-{item}.html"
         recipe = handleUrl(url) #对于每一个url拿到食谱对象
 
         #url有效
         if recipe:
             recipes.append(recipe)
+            print(f"{idx} {recipe['recipe']['name']}")
 
 
     store_json(recipes) # 加入到json
@@ -104,13 +118,13 @@ if __name__ == '__main__':
 
         current_group = current_group + 1
         total_recipe_num = total_recipe_num + len_new
+        set_state(current_group,total_recipe_num)
 
         if total_recipe_num >= 10000:  # 一万个食谱，之后结束爬取
             break
 
-        set_state(current_group,total_recipe_num)
 
-        print(f"第{current_group}批爬取完成，系统暂停30秒")
+        print(f"第{current_group}批爬取完成，系统暂停20秒")
         time.sleep(30)
 
 
