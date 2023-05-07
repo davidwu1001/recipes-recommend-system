@@ -13,6 +13,12 @@ def Delete_all():
 def Insert(recipe,ingredients,procedures):
     tx = Transaction(graph)
     try:
+        # 先检查该食谱是否已存在
+        cypher = f"match (r:Recipe) where r.name = '{recipe['name']}' return count(r) as exist"
+        exist = graph.run(cypher).data()[0]['exist']
+        if exist:
+            print(f"{recipe['name']}已存在")
+            return
         if "picture" in recipe:
             picture = recipe["picture"]
         else:
@@ -25,7 +31,7 @@ def Insert(recipe,ingredients,procedures):
             process = recipe["process"]
         else:
             process = ''
-        cypher = f"create (n:Recipe {{id:'{generate_ID()}',name:'{recipe['name']}',picture:'{picture}',time_consuming:'{time_consuming}',process:'{process}',category:{str(recipe['category'])},text:'{_escape(recipe['text'])}' }}) return n.id as id"
+        cypher = f"create (n:Recipe {{id:'{generate_ID()}',name:'{_escape(recipe['name'])}',picture:'{picture}',time_consuming:'{time_consuming}',process:'{process}',category:{str(recipe['category'])},text:'{_escape(recipe['text'])}' }}) return n.id as id"
         recipe_id = tx.run(cypher).evaluate("id")
 
         for ingredient in ingredients:
@@ -54,11 +60,30 @@ def Insert(recipe,ingredients,procedures):
     except:
         tx.rollback()
         raise
+def dataWashing(recipes):
+    """
+    清洗数据
+    :param recipes:
+    :return:
+    """
+    old_num = len(recipes)
+    for recipe in recipes:
+        if not recipe['recipe']['name']:  # 清洗掉不存在的食谱
+            recipes.remove(recipe)
+        if len(recipe['recipe']['name']) > 10:  # 清洗名字太长的数据
+            recipes.remove(recipe)
+    new_num = len(recipes)
+    print(f"数据清洗完成，清洗前{old_num}，清理后{new_num}，共清洗掉{old_num-new_num}条无效数据")
+    return recipes
 
 def main():
     with open("../爬取结果/recipes.json", 'r') as f:
         recipes = json.load(f)[1:]
-        for recipe in recipes:
+
+        recipes = dataWashing(recipes)  # 数据清洗
+
+        for idx,recipe in enumerate(recipes):
+            print(f"插入{idx} {recipe['recipe']['name']}")
             Insert(recipe['recipe'],recipe['ingredient'],recipe['procedure'])
 
 
