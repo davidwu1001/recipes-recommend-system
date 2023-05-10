@@ -2,32 +2,32 @@ import os
 from flask import Flask,request
 from flask_cors import CORS
 import config
-from api.resource.recipe import bp as recipe_bp
-from api.resource.login import bp as login_bp
-from api.resource.user import bp as user_bp
-from api.resource.image import bp as image_bp
-from api.resource.collection import bp as collection_bp
-from api.resource.ingredient import bp as ingredient_bp
+from api.resource import recipe,login,user,image, collection,ingredient
 from utils.process_token import decodeToken
 
+# 创建app实例
 app = Flask(__name__)
-
-app.config.from_object(config) #读入配置文件
+# 读入配置文件
+app.config.from_object(config)
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'media')
-# api = Api(app)
+# 允许跨域请求
 CORS(app)
-app.register_blueprint(recipe_bp)
-app.register_blueprint(login_bp)
-app.register_blueprint(user_bp)
-app.register_blueprint(image_bp)
-app.register_blueprint(collection_bp)
-app.register_blueprint(ingredient_bp)
+app.register_blueprint(recipe.bp)
+app.register_blueprint(login.bp)
+app.register_blueprint(user.bp)
+app.register_blueprint(image.bp)
+app.register_blueprint(collection.bp)
+app.register_blueprint(ingredient.bp)
 
 # init()
 # api.add_resource(Recipe,'/')
 
 @app.before_request
 def before_request():
+    """
+    检查token
+    :return:
+    """
     white_list = ['login.login','image.image']
     print("endpoint=",request.endpoint)
 

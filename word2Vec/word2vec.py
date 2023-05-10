@@ -33,7 +33,7 @@ def process_corpus(file):
                      window=7,  # 使模型更关注单词的语义特征
                      )
     # 保存模型
-    model.save("./训练结果/word2vec.model")
+    model.save("./训练结果/word2vec.word2Vec")
 
 
 

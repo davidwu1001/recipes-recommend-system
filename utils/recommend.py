@@ -44,7 +44,7 @@ def ingredient_recommend_main(ingredient, target_num):
     :param target_num: 推荐生成的数量
     :return: 推荐主料列表
     '''
-    model_path = os.path.join(current_app.root_path, 'model', '训练结果/word2vec.model')
+    model_path = os.path.join(current_app.root_path, 'word2Vec', '训练结果/word2vec.word2Vec')
     model = Word2Vec.load(model_path)
 
     vocab = model.wv.key_to_index  # 所有食材词汇表
@@ -68,7 +68,7 @@ def ingredient_recommend_recipe(ingredient, target_num):
     :return: 推荐食谱列表
     '''
     # 读取word3vec模型
-    model_path = os.path.join(current_app.root_path, 'model','训练结果/word2vec.model')
+    model_path = os.path.join(current_app.root_path, 'word2Vec','训练结果/word2vec.word2Vec')
     model = Word2Vec.load(model_path)
     ingredient_vector = model.wv[ingredient['name']]  # 食材向量
     # 读取食谱向量文件 todo 换成由word2vec模型直接计算
