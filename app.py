@@ -4,14 +4,19 @@ from flask_cors import CORS
 import config
 from api.resource import recipe,login,user,image, collection,ingredient
 from utils.process_token import decodeToken
+from exts import db, migrate  # 插件
 
 # 创建app实例
 app = Flask(__name__)
 # 读入配置文件
 app.config.from_object(config)
-app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'media')
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'media')  # todo 将服务放到服务器上，使用服务器的静态文件地址
 # 允许跨域请求
 CORS(app)
+# db绑定app
+db.init_app(app)
+# migrate绑定app,db
+migrate.init_app(app, db)
 app.register_blueprint(recipe.bp)
 app.register_blueprint(login.bp)
 app.register_blueprint(user.bp)
@@ -47,5 +52,5 @@ def before_request():
 
 
 if __name__ == '__main__':
-    app.run(debug=True,port=8001)
+    app.run(debug=True,port=8001,host="0.0.0.0")
 

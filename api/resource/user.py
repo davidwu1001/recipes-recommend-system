@@ -1,5 +1,7 @@
 from flask_restful import Resource,Api,reqparse,fields,marshal_with
 from flask import Blueprint, request
+
+import model
 from utils.neo4j import graph
 from model import UserModel
 from exts import session
@@ -15,9 +17,9 @@ url_parser = reqparse.RequestParser()
 url_parser.add_argument("tempUrl",type=str,location="args",help="没有URL")
 
 user_fields = {
-    "nickName":fields.String(attribute='user.nickName'),
-    "avatarUrl":fields.String(attribute='user.avatarUrl'),
-    "openid":fields.String(attribute='user.openid'),
+    "nickName":fields.String(attribute='nickName'),
+    "avatarUrl":fields.String(attribute='avatarUrl'),
+    "openid":fields.String(attribute='openid'),
 }
 response_fields = {
     'msg': fields.String(default="无效响应"),
@@ -33,8 +35,8 @@ class User(Resource):
     @marshal_with(response_fields)
     def get(self):
         openid = request.environ['openid']
-        cypher = f"match (u:User) where u.openid = '{openid}' return u as user"
-        user = graph.run(cypher).data()[0]
+
+        user = model.UserModel.query.filter_by(openid=openid).first()
         return {"code": 10000, "msg": "查询用户信息成功", "data": user}
 
     @marshal_with(response_fields)
@@ -43,10 +45,11 @@ class User(Resource):
         openid = request.environ['openid']
         nickName = args.get("nickName")
         avatarUrl = args.get("avatarUrl")
-
-        user = UserModel(nickName=nickName,openid=openid,avatarUrl = avatarUrl)
+        print("昵称                        ",nickName,avatarUrl)
         try:
-            session.add(user)
+            user = UserModel.query.filter_by(openid=openid).first()
+            user.nickName = nickName
+            user.avatarUrl = avatarUrl
             session.commit()
             return {"code": 10000, "msg": "修改成功","data":user}
         except Exception as e:

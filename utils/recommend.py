@@ -1,3 +1,4 @@
+import numpy
 import scipy.spatial.distance as dist
 from gensim.models import Word2Vec
 from flask import current_app
@@ -20,21 +21,26 @@ def recommend_recipes(recipe, target_num):
         if item['id'] == recipe['id']:
             recipe = item
             break
-    recommand_recipes = []  # 推荐生成的食谱列表
 
-    for vector_recipe in vector_recipes:  # 计算每一个食谱与recipe的余弦相似度
+    # 构造生成的食谱列表
+    recommend_recipes = []  # 推荐生成的食谱列表
+
+    # 计算每一个食谱与recipe的余弦相似度
+    for vector_recipe in vector_recipes:
         if vector_recipe['id'] != recipe['id']:  # 排序recipe本身
             cosine_sim = 1 - dist.cosine(vector_recipe['vector'], recipe['vector'])
-            recommand_recipes.append(
+            recommend_recipes.append(
                 {"id": vector_recipe['id'], 'name': vector_recipe['name'], "cosine_sim": cosine_sim})
+    # 根据consine_sim对recommand_recipes降序排序
+    recommend_recipes = sorted(recommend_recipes, key=lambda recipe: recipe['cosine_sim'],
+                               reverse=True)
 
-    recommand_recipes = sorted(recommand_recipes, key=lambda recipe: recipe['cosine_sim'],
-                               reverse=True)  # 根据consine_sim对recommand_recipes降序排序
-
-    for recipe in recommand_recipes[0:target_num]:
+    # 检查推荐食谱的对应余弦相似度
+    for recipe in recommend_recipes[0:target_num]:
         print(recipe['name'], recipe['cosine_sim'])
 
-    return recommand_recipes[0:target_num]
+    # 若target_num = 6 返回前6个食谱
+    return recommend_recipes[0:target_num]
 
 
 def ingredient_recommend_main(ingredient, target_num):
@@ -44,19 +50,26 @@ def ingredient_recommend_main(ingredient, target_num):
     :param target_num: 推荐生成的数量
     :return: 推荐主料列表
     '''
-    model_path = os.path.join(current_app.root_path, 'word2Vec', '训练结果/word2vec.word2Vec')
+    # 导入模型
+    model_path = os.path.join(current_app.root_path, 'word2Vec', '训练结果/word2vec.model')
     model = Word2Vec.load(model_path)
 
-    vocab = model.wv.key_to_index  # 所有食材词汇表
-    ingredients_recommend = []  # 食材推荐列表
-    for item in vocab:  # 计算ingredient与所有其他食材的相似度
+    # 所有食材词汇表
+    vocab = model.wv.key_to_index
+
+    # 构造食材推荐列表
+    ingredients_recommend = []
+
+    # 计算  本食材 与所有其他食材的相似度
+    for item in vocab:
         if item != ingredient['name']:  # 排除自己
             new_ingredient = {'name': item, 'sim': model.wv.similarity(item, ingredient['name'])}
             ingredients_recommend.append(new_ingredient)
+    # 按照相似度 降序排序
     ingredients_recommend = sorted(ingredients_recommend, key=lambda ingredient: ingredient['sim'],
-                                   reverse=True)  # 根据consine_sim对recommand_recipes降序排序
-    print(ingredients_recommend[0:target_num])
+                                   reverse=True)
 
+    # 若target_num = 6，取前6个推荐食材
     return ingredients_recommend[0:target_num]
 
 
@@ -68,32 +81,59 @@ def ingredient_recommend_recipe(ingredient, target_num):
     :return: 推荐食谱列表
     '''
     # 读取word3vec模型
-    model_path = os.path.join(current_app.root_path, 'word2Vec','训练结果/word2vec.word2Vec')
+    model_path = os.path.join(current_app.root_path, 'word2Vec','训练结果/word2vec.model')
     model = Word2Vec.load(model_path)
-    ingredient_vector = model.wv[ingredient['name']]  # 食材向量
+
+    # 获取食材向量
+    ingredient_vector = model.wv[ingredient['name']]
+
     # 读取食谱向量文件 todo 换成由word2vec模型直接计算
     path = os.path.join(current_app.root_path, 'static', 'json/vector_recipes.json')
     with open(path, 'r', encoding='utf-8') as f:
         vector_recipes = json.load(f)
     # 筛选食谱
-    cypher = f"match (r:Recipe)-[n:need]->(i:Ingredient) where i.name = '{ingredient['name']}'  return r.id as id "
-    recipe_id_list = graph.run(cypher).data()  # 筛选后的食谱id
-    print(recipe_id_list)
-    vector_recipes_selected = []
-    for iitem in recipe_id_list:
-        for item in vector_recipes: # 查找每一个id的食谱词向量
-            if item['id'] == iitem['id']:
-                vector_recipes_selected.append(item)
-                break
+    # cypher = f"match (r:Recipe)-[n:need]->(i:Ingredient) where i.name = '{ingredient['name']}' return r.id as id "
+    # recipe_id_list = graph.run(cypher).data()  # 筛选后的食谱id
+    #
+    # print("recipe_list",recipe_id_list)
+    #
+    # # 构造 计算每一个符合要求的食谱的 词向量
+    # vector_recipes_selected = []
+    # for iitem in recipe_id_list:
+    #     for item in vector_recipes: # 查找每一个id的食谱词向量
+    #         if item['id'] == iitem['id']:
+    #             vector_recipes_selected.append(item)
+    #             break
+    #
+    # print("vector_recipes_selected",vector_recipes_selected)
+    # # 推荐的食谱列表
+    # recipes_recommend = []
+    # # 食材依次与所有食谱求相似度
+    # for recipe_vector in vector_recipes_selected:
+    #     cosine_sim = 1 - dist.cosine(recipe_vector['vector'], ingredient_vector)  # 计算相似度
+    #     new_recipe = {'id': recipe_vector['id'], 'name': recipe_vector['name'], 'sim': cosine_sim}
+    #     recipes_recommend.append(new_recipe)
 
-    recipes_recommend = []  # 推荐的食谱列表
-    for recipe_vector in vector_recipes_selected:  # 食材依次与所有食谱求相似度
-        cosine_sim = 1 - dist.cosine(recipe_vector['vector'], ingredient_vector)  # 计算相似度
-        new_recipe = {'id': recipe_vector['id'], 'name': recipe_vector['name'], 'sim': cosine_sim}
-        recipes_recommend.append(new_recipe)
+    # 构造推荐的食谱列表
+    recommend_recipes = []
+    print("食材向量=",ingredient_vector.shape,type(ingredient_vector))
+    # 计算每一个食谱与recipe的余弦相似度
+    for vector_recipe in vector_recipes:
+        if len(vector_recipe['vector']) != 0:
+            vector_recipe['vector'] = numpy.array(vector_recipe['vector'])  # list转化为numpt类型
+            cosine_sim = 1 - dist.cosine(vector_recipe['vector'], ingredient_vector)
+            recommend_recipes.append(
+                {"id": vector_recipe['id'], 'name': vector_recipe['name'], "cosine_sim": cosine_sim})
 
     # 根据consine_sim对recommand_recipes降序排序
-    recipes_recommend = sorted(recipes_recommend, key=lambda recipe: recipe['sim'],
+    recommend_recipes = sorted(recommend_recipes, key=lambda recipe: recipe['cosine_sim'],
                                reverse=True)
-    print(recipes_recommend)
-    return recipes_recommend
+
+    # 检查推荐食谱的对应余弦相似度
+    for recipe in recommend_recipes[0:target_num]:
+        print(recipe['name'], recipe['cosine_sim'])
+
+    # 若target_num = 6 返回前6个食谱
+    return recommend_recipes[0:target_num]
+
+

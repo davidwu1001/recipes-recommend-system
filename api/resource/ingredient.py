@@ -18,10 +18,17 @@ response_fields = {
 }
 class Ingredient(Resource):
     def get(self):
+        # 解析参数
         args = parser.parse_args()
         recommend_ingredient_name = args.get("recommend_ingredient_name")
         recommend_target_num = args.get("recommend_target_num")
-        ingredients_recommend = ingredient_recommend_main({"name":recommend_ingredient_name},recommend_target_num)  # 调用util.recommend.ingredient_recommend_main
+
+        # 调用util.recommend.ingredient_recommend_main
+        try:
+            ingredients_recommend = ingredient_recommend_main({"name":recommend_ingredient_name},recommend_target_num)
+        except Exception as e:
+            return {"code": 10001, "msg": "暂无推荐", "data": {}}
+
         ingredients_name_list_recommend = []  # 推荐食材name列表
         for item in ingredients_recommend:
             ingredients_name_list_recommend.append(item['name'])

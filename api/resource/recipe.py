@@ -9,6 +9,7 @@ parser = reqparse.RequestParser()
 parser.add_argument("recipe_id",type=str,location="args",help="id不能为空")
 parser.add_argument("name",type=str,location="args",help="姓名的格式错误")
 parser.add_argument("season",type=str,location="args",help="季节的格式错误")
+parser.add_argument("province",type=str,location="args",help="地区的格式错误")
 parser.add_argument("category",type=str,location="args",help="菜品的格式错误")
 parser.add_argument("openid",type= str,location="args",help="用户openid的格式错误")
 parser.add_argument("hot",type= str,location="args",help="用户openid的格式错误")
@@ -56,6 +57,7 @@ class Recipe(Resource):
         recipe_id = args.get('recipe_id')
         name = args.get("name")
         season = args.get("season")
+        province = args.get("province")
         category = args.get("category")
         openid = request.environ['openid']
         recommend_recipe_id = args.get("recommend_recipe_id")
@@ -82,27 +84,38 @@ class Recipe(Resource):
             return {"code": 10000, "msg": "推荐生成完成", "data": res}
         elif recommend_ingredient_name and recommend_target_num:
             print("由食材推荐食谱")
-            recipes_recommend = ingredient_recommend_recipe({'name':recommend_ingredient_name},recommend_target_num)  # 调用util.recommend.ingredient_recommend_recipe
-
+            try:
+                recipes_recommend = ingredient_recommend_recipe({'name':recommend_ingredient_name},recommend_target_num)  # 调用util.recommend.ingredient_recommend_recipe
+            except Exception as e:
+                return  {"code": 10001, "msg": "暂无推荐", "data": {}}
             recipes_id_list = []  # 生成的推荐食谱id列表
             for recipe in recipes_recommend:
                 recipes_id_list.append(recipe['id'])
 
-            cypher = f"match (r:Recipe)-[n:need]->(i:Ingredient) where r.id in {str(recipes_id_list)} and i.name = '{recommend_ingredient_name}'  return r as recipe"
-            print(cypher)
+            cypher = f"match (r:Recipe)-[n:need]->(i:Ingredient) where r.id in {str(recipes_id_list)} return distinct r as recipe limit 6"
+
             res = graph.run(cypher).data()
             return {"code": 10000, "msg": "推荐生成完成", "data": res}
 
         elif category:
-            #根据菜品查询食谱
-            print("根据菜品查询食谱")
+            # 筛选条件
+            print("根据菜品查询食谱",category,province,season)
             if category == "不限":
-                cypher = f"match (n:Recipe) where n.name contains '{name}' optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect limit 10"
+                if province and season:  # 有时令属性
+                    print("有时令，无分类查询")
+                    cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name contains '{name}' and ne.type = '主料' and '{province}' in i.{season} optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect limit 10"
+                else:  # 无时令属性
+                    print("无时令，无分类查询")
+                    cypher = f"match (n:Recipe) where n.name contains '{name}' optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect limit 10"
             else:
-                cypher = f"match (n:Recipe) where n.name contains '{name}' and '{category}' in n.category optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect limit 10"
+                if province and season:  # 有时令属性
+                    print("有时令，有分类查询")
+                    cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name contains '{name}'  and '{category}' in n.category and ne.type = '主料' and '{province}' in i.{season} optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect limit 10"
+                else:
+                    print("无时令，有分类查询")
+                    cypher = f"match (n:Recipe) where n.name contains '{name}' and '{category}' in n.category optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect limit 10"
             res = graph.run(cypher).data()
-            print(res)
-            return {"code":10000,"msg":"查询成功","data":res}
+            return {"code":10000,"msg":"筛选结果是","data":res}
         elif hot:
             # 根据流行程度查询六个菜谱 todo:如何体现热门 当前是默认排序
             print("根据流行程度查询六个菜谱")
