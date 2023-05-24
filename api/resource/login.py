@@ -22,21 +22,23 @@ class Login(Resource):
             "grant_type": "authorization_code"
         }
         response = requests.get(url="https://api.weixin.qq.com/sns/jscode2session", params=params).json()
+
+        # 获取openid和token
         openid = response["openid"]
         token = setToken(openid)
-        # 查询数据库
 
+        # 查询有无user
         user = model.UserModel.query.filter_by(openid=openid).first()
-        if user:
+        if user:  # 用户存在 直接返回token
+            print("用户已存在")
             return {"code": 10000, "msg": "注册成功", "data": {"token": token}}
-        else:
-            print("user不存在")
+        else:  # 用户不存在 创建用户记录
+            print("用户不存在")
             try:
                 user = model.UserModel(openid=openid, nickName="微信用户",
                                        avatarUrl="12412")
                 session.add(user)
                 session.commit()
-                print("自动注册")
                 return {"code": 10000, "msg": "自动注册成功", "data": {"token": token}}
             except Exception as e:
                 print(e)

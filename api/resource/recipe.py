@@ -1,5 +1,7 @@
 from flask import Blueprint, request
 from flask_restful import Resource,Api,reqparse,fields,marshal_with
+
+import model
 from utils.neo4j import graph
 from utils.recommend import recommend_recipes,ingredient_recommend_recipe
 bp = Blueprint("recipe",__name__)
@@ -67,10 +69,20 @@ class Recipe(Resource):
         print(recipe_id, openid)
         if recipe_id:
             #根据id查询菜谱
-            print("根据id查询菜谱",recipe_id)
-            cypher = f"MATCH (r:Recipe) WHERE r.id = '{recipe_id}' OPTIONAL MATCH (u:User)-[c:collect]->(r) WHERE u.openid = '{openid}' OPTIONAL MATCH (r)-[n:need]->(i:Ingredient) OPTIONAL MATCH (r)-[s:step]->(p:Procedure) WITH r AS recipe, coalesce(count(c)) AS collect, collect(i) AS ingredients, collect(n.amount) AS amounts, p ORDER BY p.seq WITH recipe, collect, ingredients, amounts, collect(p) AS procedures UNWIND range(0,size(ingredients)-1) as idx WITH recipe, collect, apoc.map.setKey(ingredients[idx], 'amount', amounts[idx]) AS ingredient, procedures RETURN recipe, collect, collect(ingredient) AS ingredients, procedures"
-            res = graph.run(cypher).data()
-            return {"code":10000,"msg":"查询成功","data":res}
+            print("根据id查询菜谱",recipe_id,openid)
+
+
+
+            # neo4j中查询食谱信息
+            cypher = f"match (r:Recipe)-[ne:need]->(i:Ingredient) where r.id = '{recipe_id}' with collect(i) as ingredients, r as recipe match (recipe)-[s:step]->(p:Procedure) with recipe,ingredients,collect(p) as procedures RETURN {{recipe: recipe, ingredients: ingredients, procedures: procedures}} AS recipe"
+            recipe = graph.run(cypher).data()[0]['recipe']
+
+            # mysql中查询收藏关系
+            user = model.UserModel.query.filter_by(openid=openid).first()
+            collect = model.CollectionModel.query.filter_by(user_id=user.id,recipe_id=recipe_id).first()
+            recipe['recipe']['collect'] = (lambda c : 1 if collect  else 0)(collect)
+
+            return {"code":10000,"msg":"查询成功","data":[recipe]}
         elif recommend_recipe_id and recommend_target_num:  # 查询推荐食谱
             print("由食谱推荐食谱")
             recipes_recommend = recommend_recipes({"id":recommend_recipe_id},recommend_target_num)  # 调用util.recommend.recommend_recipes

@@ -2,7 +2,7 @@ import os
 from flask import Flask,request
 from flask_cors import CORS
 import config
-from api.resource import recipe,login,user,image, collection,ingredient
+from api.resource import recipe,login,user,image, collection,ingredient,order
 from utils.process_token import decodeToken
 from exts import db, migrate  # 插件
 
@@ -17,12 +17,14 @@ CORS(app)
 db.init_app(app)
 # migrate绑定app,db
 migrate.init_app(app, db)
+
 app.register_blueprint(recipe.bp)
 app.register_blueprint(login.bp)
 app.register_blueprint(user.bp)
 app.register_blueprint(image.bp)
 app.register_blueprint(collection.bp)
 app.register_blueprint(ingredient.bp)
+app.register_blueprint(order.bp)
 
 # init()
 # api.add_resource(Recipe,'/')
@@ -52,5 +54,6 @@ def before_request():
 
 
 if __name__ == '__main__':
+    print(app.debug)
     app.run(debug=True,port=8001)
 

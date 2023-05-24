@@ -1,7 +1,8 @@
 import  json
 from utils.escape import _escape,_unescape
-from py2neo import Graph,NodeMatcher,RelationshipMatcher,Transaction
 import uuid
+from py2neo import Graph,NodeMatcher,RelationshipMatcher,Transaction
+
 graph = Graph("bolt://localhost:7687", auth=("neo4j","11111111w"))
 def generate_ID():
     return str(uuid.uuid4())

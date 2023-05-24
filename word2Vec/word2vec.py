@@ -3,7 +3,7 @@ from py2neo import Graph
 from gensim.models import Word2Vec
 import numpy as np
 
-ADDRESS = "bolt://localhost:7687"
+ADDRESS = "bolt://localhost:7   687"
 USERNAME = "neo4j"
 PASSWORD = "11111111w"
 

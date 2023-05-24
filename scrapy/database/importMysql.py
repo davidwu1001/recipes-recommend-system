@@ -1,3 +1,4 @@
+import model
 from exts import session
 from model import UserModel,RecipeModel,IngredientModel
 import json
@@ -70,7 +71,27 @@ def handleIngredient():
         for category in ingredients:
             Insert_Ingredient(category)
 
-if __name__ == "__main__":
 
-    handlerRecipe()
+def syncIngredientID():
+    # 获取neo4j中的所有食材
+    cypher = "match (n:Ingredient) return n as ingredient"
+    ingredients_neo4j = graph.run(cypher).data()
+
+    # mysql中食材清空 <- 先把用户信息和交互信息都删了 done
+
+    # 循环全部添加到mysql中
+    count = 0
+    for ingredient_neo4j in ingredients_neo4j:
+        ingredient_neo4j = ingredient_neo4j['ingredient']  # 截取
+
+        ingredient_mysql = model.IngredientModel(id=ingredient_neo4j['id'],name=ingredient_neo4j['name'],category=ingredient_neo4j['category'],subcategory=ingredient_neo4j['subcategory'])
+        session.add(ingredient_mysql)
+        count = count + 1
+    session.commit()
+    print(count)
+
+if __name__ == "__main__":
+    with app.app_context():
+        pass
+        # syncIngredientID()
     # handleIngredient()
