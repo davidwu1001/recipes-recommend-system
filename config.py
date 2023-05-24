@@ -22,7 +22,7 @@ HOSTNAME = "49.233.27.20"
 PORT = 3306
 USERNAME = "root"
 PASSWORD = "root"
-DATABASE = "flask-admin-test"
+DATABASE = "flask_admin_test"
 SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{USERNAME}:{PASSWORD}@{HOSTNAME}:{PORT}/{DATABASE}?charset=utf8mb4"
 
 
