@@ -2,6 +2,7 @@ import os
 from flask import Flask,request
 from flask_cors import CORS
 import config
+import model
 from api.resource import recipe,login,user,image, collection,ingredient,order
 from utils.process_token import decodeToken
 from exts import db, migrate  # 插件
@@ -51,6 +52,8 @@ def before_request():
         # token 验证成功 拿到openid
         openid = verify['openid']
         request.environ['openid'] = openid
+        user = model.UserModel.query.filter_by(openid=openid).first()
+        request.environ['user_id'] = user.id
 
 
 if __name__ == '__main__':

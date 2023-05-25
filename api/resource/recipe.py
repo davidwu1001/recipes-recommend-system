@@ -1,6 +1,6 @@
 from flask import Blueprint, request
 from flask_restful import Resource,Api,reqparse,fields,marshal_with
-
+from flask_paginate import Pagination
 import model
 from utils.neo4j import graph
 from utils.recommend import recommend_recipes,ingredient_recommend_recipe
@@ -18,7 +18,8 @@ parser.add_argument("hot",type= str,location="args",help="用户openid的格式�
 parser.add_argument("recommend_recipe_id",type= str,location="args",help="推荐食谱的id")
 parser.add_argument("recommend_target_num",type= int,location="args",help="推荐生成的食谱个数")
 parser.add_argument("recommend_ingredient_name",type= str,location="args",help="推荐食材的name")
-
+parser.add_argument("page",type= int,location="args",help="当前页数")
+parser.add_argument("per_page",type= int,location="args",help="每个多少个")
 
 response_fields = {
     'msg': fields.String(default="无效响应"),
@@ -43,7 +44,7 @@ recipe_fields = {
     'time_consuming':fields.String(attribute='recipe.time_consuming'),
     'process':fields.String(attribute='recipe.process'),
     'category':fields.List(fields.String,attribute="recipe.category"),
-    'collect':fields.Integer(),
+    'collect':fields.Integer(attribute='recipe.collect'),
     'ingredients':fields.List(fields.Nested(ingredient_fields)),
     'procedures': fields.List(fields.Nested(procedures_fields))
 }
@@ -61,17 +62,19 @@ class Recipe(Resource):
         season = args.get("season")
         province = args.get("province")
         category = args.get("category")
-        openid = request.environ['openid']
+        page = args.get("page")
+        per_page = args.get("per_page")
         recommend_recipe_id = args.get("recommend_recipe_id")
         recommend_target_num = args.get("recommend_target_num")
         recommend_ingredient_name = args.get("recommend_ingredient_name")
         hot = args.get("hot")
-        print(recipe_id, openid)
+
+        openid = request.environ['openid']
+        user_id = request.environ['user_id']
+
         if recipe_id:
-            #根据id查询菜谱
-            print("根据id查询菜谱",recipe_id,openid)
-
-
+            #食谱详情
+            print("食谱详情",recipe_id,openid)
 
             # neo4j中查询食谱信息
             cypher = f"match (r:Recipe)-[ne:need]->(i:Ingredient) where r.id = '{recipe_id}' with collect(i) as ingredients, r as recipe match (recipe)-[s:step]->(p:Procedure) with recipe,ingredients,collect(p) as procedures RETURN {{recipe: recipe, ingredients: ingredients, procedures: procedures}} AS recipe"
@@ -81,7 +84,7 @@ class Recipe(Resource):
             user = model.UserModel.query.filter_by(openid=openid).first()
             collect = model.CollectionModel.query.filter_by(user_id=user.id,recipe_id=recipe_id).first()
             recipe['recipe']['collect'] = (lambda c : 1 if collect  else 0)(collect)
-
+            print(recipe['recipe'])
             return {"code":10000,"msg":"查询成功","data":[recipe]}
         elif recommend_recipe_id and recommend_target_num:  # 查询推荐食谱
             print("由食谱推荐食谱")
@@ -111,22 +114,30 @@ class Recipe(Resource):
 
         elif category:
             # 筛选条件
-            print("根据菜品查询食谱",category,province,season)
+            print("筛选食谱",category,province,season,page,per_page)
             if category == "不限":
                 if province and season:  # 有时令属性
                     print("有时令，无分类查询")
-                    cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name contains '{name}' and ne.type = '主料' and '{province}' in i.{season} optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect limit 10"
+                    cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name contains '{name}' and ne.type = '主料' and '{province}' in i.{season} optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect skip {(page - 1)*per_page} limit {per_page}"
                 else:  # 无时令属性
                     print("无时令，无分类查询")
-                    cypher = f"match (n:Recipe) where n.name contains '{name}' optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect limit 10"
+                    cypher = f"match (n:Recipe) where n.name contains '{name}' optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect skip {(page - 1)*per_page} limit {per_page}"
             else:
                 if province and season:  # 有时令属性
                     print("有时令，有分类查询")
-                    cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name contains '{name}'  and '{category}' in n.category and ne.type = '主料' and '{province}' in i.{season} optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect limit 10"
+                    cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name contains '{name}'  and '{category}' in n.category and ne.type = '主料' and '{province}' in i.{season} optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect skip {(page - 1)*per_page} limit {per_page}"
                 else:
                     print("无时令，有分类查询")
-                    cypher = f"match (n:Recipe) where n.name contains '{name}' and '{category}' in n.category optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect limit 10"
+                    cypher = f"match (n:Recipe) where n.name contains '{name}' and '{category}' in n.category optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect skip {(page - 1)*per_page} limit {per_page}"
             res = graph.run(cypher).data()
+            print(cypher)
+            # 为每个食谱查询收藏情况
+            for index,recipe in enumerate(res):
+                recipe_id = recipe['recipe']['id']
+                collect = model.CollectionModel.query.filter_by(user_id=user_id,recipe_id=recipe_id).first()
+                res[index]["collect"] = (lambda c: 1 if c else 0)(collect)
+
+
             return {"code":10000,"msg":"筛选结果是","data":res}
         elif hot:
             # 根据流行程度查询六个菜谱 todo:如何体现热门 当前是默认排序
@@ -134,12 +145,7 @@ class Recipe(Resource):
             cypher = "match (n:Recipe) return n as recipe limit 6"
             res = graph.run(cypher).data()
             return {"code":10000,"msg":"查询成功","data":res}
-        elif openid:
-            # 根据用户id查询用户已经收藏的食谱
-            print("根据用户id查询食谱和收藏关系")
-            cypher = f"match (u:User)-[c:collect]->(r:Recipe) where u.openid = '{openid}' return r as recipe,coalesce(count(c)) as collect"
-            res = graph.run(cypher).data()
-            return {"code":10000,"msg":"查询成功","data":res}
+
 
     @marshal_with(response_fields)
     def post(self):

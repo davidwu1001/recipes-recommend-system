@@ -45,11 +45,13 @@ class User(Resource):
         openid = request.environ['openid']
         nickName = args.get("nickName")
         avatarUrl = args.get("avatarUrl")
-        print("昵称                        ",nickName,avatarUrl)
+        print("昵称",nickName,avatarUrl)
         try:
             user = UserModel.query.filter_by(openid=openid).first()
-            user.nickName = nickName
-            user.avatarUrl = avatarUrl
+            if nickName:
+                user.nickName = nickName
+            if avatarUrl:
+                user.avatarUrl = avatarUrl
             session.commit()
             return {"code": 10000, "msg": "修改成功","data":user}
         except Exception as e:
