@@ -4,6 +4,7 @@ from flask_paginate import Pagination
 import model
 from utils.neo4j import graph
 from utils.recommend import recommend_recipes,ingredient_recommend_recipe
+from exts import session
 bp = Blueprint("recipe",__name__)
 api = Api(bp)
 
@@ -80,11 +81,27 @@ class Recipe(Resource):
             cypher = f"match (r:Recipe)-[ne:need]->(i:Ingredient) where r.id = '{recipe_id}' with collect(i) as ingredients, r as recipe match (recipe)-[s:step]->(p:Procedure) with recipe,ingredients,collect(p) as procedures RETURN {{recipe: recipe, ingredients: ingredients, procedures: procedures}} AS recipe"
             recipe = graph.run(cypher).data()[0]['recipe']
 
+            # 所有食谱
+            ingredients =recipe['ingredients']
+            # 交互记录
+            for ingredient in ingredients:
+                interaction = model.User_IngredientModel.query.filter_by(user_id=user_id,
+                                                                         ingredient_id=ingredient['id']).first()
+                if interaction:  # 存在
+                    interaction.view_count = interaction.view_count + 1
+                else:  # 不存在
+                    interaction = model.User_IngredientModel(user_id=user_id, ingredient_id=ingredient['id'],
+                                                             view_count=1)
+                    session.add(interaction)
+            session.commit()
+
             # mysql中查询收藏关系
             user = model.UserModel.query.filter_by(openid=openid).first()
             collect = model.CollectionModel.query.filter_by(user_id=user.id,recipe_id=recipe_id).first()
             recipe['recipe']['collect'] = (lambda c : 1 if collect  else 0)(collect)
             print(recipe['recipe'])
+
+
             return {"code":10000,"msg":"查询成功","data":[recipe]}
         elif recommend_recipe_id and recommend_target_num:  # 查询推荐食谱
             print("由食谱推荐食谱")

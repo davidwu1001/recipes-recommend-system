@@ -78,6 +78,19 @@ class Collection(Resource):
             # 添加收藏记录
             collection = model.CollectionModel(user_id=user.id, recipe_id=recipe_id)
             session.add(collection)
+
+            # 所有食材
+            cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.id = '{recipe_id}' return i as ingredient"
+            ingredients = graph.run(cypher).data()
+            # 交互记录
+            for ingredient in ingredients:
+                ingredient = ingredient['ingredient']
+                interaction = model.User_IngredientModel.query.filter_by(user_id=user.id,ingredient_id=ingredient['id']).first()
+                if interaction:  # 存在
+                    interaction.collect_count = interaction.collect_count + 1
+                else:  # 不存在
+                    interaction = model.User_IngredientModel(user_id=user.id,ingredient_id=ingredient['id'],collect_count=1)
+                    session.add(interaction)
             session.commit()
             return {"code": 10000, "msg": "收藏成功"}
         else:  # 存在收藏关系
@@ -101,6 +114,24 @@ class Collection(Resource):
             print("用户已收藏")
             # 删除收藏记录
             session.delete(collection)
+
+            # 所有食材
+            cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.id = '{recipe_id}' return i as ingredient"
+            ingredients = graph.run(cypher).data()
+            # 交互记录
+            for ingredient in ingredients:
+                ingredient = ingredient['ingredient']
+                interaction = model.User_IngredientModel.query.filter_by(user_id=user.id, ingredient_id=ingredient['id']).first()
+                if interaction:  # 存在
+                    print(f"{ingredient['id']}和{user.id}的交互记录存在")
+                    interaction.collect_count = interaction.collect_count - 1
+                else:  # 不存在
+                    print(f"{ingredient['id']}和{user.id}的交互记录不存在")
+
+                    interaction = model.User_IngredientModel(user_id=user.id, ingredient_id=ingredient['id'],
+                                                             collect_count=0)
+                    session.add(interaction)
+
             session.commit()
             return {"code": 10000, "msg": "取消收藏成功"}
         else:  # 不存在收藏关系

@@ -102,10 +102,12 @@ class OrderModel(db.Model):
     __tablename__ = "order"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    address = db.Column(db.String(1000))
 
     ingredients = db.relationship('IngredientModel',secondary=order_item,backref=db.backref('orders',lazy='dynamic'))
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
 
 
 
@@ -118,7 +120,7 @@ class User_IngredientModel(db.Model):
     __tablename__ = "user_ingredient"
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     view_count = db.Column(db.Integer, default=0)
-    is_favorite = db.Column(db.Boolean, default=False)
+    collect_count = db.Column(db.Integer, default=0)
     purchase_count = db.Column(db.Integer, default=0)
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
