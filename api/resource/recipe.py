@@ -152,31 +152,33 @@ class Recipe(Resource):
                 # return {"code": 10001, "msg": e, "data": {}}
         elif category:
             # 筛选条件
-            print("筛选食谱",category,province,season,page,per_page)
+            print("筛选食谱",category,province,season,page,per_page,user_id)
             if category == "不限":
                 if province and season:  # 有时令属性
                     print("有时令，无分类查询")
-                    cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name contains '{name}' and ne.type = '主料' and '{province}' in i.{season} optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect skip {(page - 1)*per_page} limit {per_page}"
+                    cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name contains '{name}' and ne.type = '主料' and '{province}' in i.{season} optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe skip {(page - 1)*per_page} limit {per_page}"
                 else:  # 无时令属性
                     print("无时令，无分类查询")
-                    cypher = f"match (n:Recipe) where n.name contains '{name}' optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect skip {(page - 1)*per_page} limit {per_page}"
+                    cypher = f"match (n:Recipe) where n.name contains '{name}' optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe skip {(page - 1)*per_page} limit {per_page}"
             else:
                 if province and season:  # 有时令属性
                     print("有时令，有分类查询")
-                    cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name contains '{name}'  and '{category}' in n.category and ne.type = '主料' and '{province}' in i.{season} optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect skip {(page - 1)*per_page} limit {per_page}"
+                    cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name contains '{name}'  and '{category}' in n.category and ne.type = '主料' and '{province}' in i.{season} optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe skip {(page - 1)*per_page} limit {per_page}"
                 else:
                     print("无时令，有分类查询")
-                    cypher = f"match (n:Recipe) where n.name contains '{name}' and '{category}' in n.category optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe, coalesce(count(col)) as collect skip {(page - 1)*per_page} limit {per_page}"
-            res = graph.run(cypher).data()
-            print(cypher)
-            # 为每个食谱查询收藏情况
-            for index,recipe in enumerate(res):
+                    cypher = f"match (n:Recipe) where n.name contains '{name}' and '{category}' in n.category optional match (u:User)-[col:collect]->(n) where u.openid = '{openid}' return n as recipe skip {(page - 1)*per_page} limit {per_page}"
+            recipes = graph.run(cypher).data()
+
+            # 收藏关系
+            for idx, recipe in enumerate(recipes):
                 recipe_id = recipe['recipe']['id']
-                collect = model.CollectionModel.query.filter_by(user_id=user_id,recipe_id=recipe_id).first()
-                res[index]["collect"] = (lambda c: 1 if c else 0)(collect)
+                collection = model.CollectionModel.query.filter_by(user_id=user_id, recipe_id=recipe_id).first()
+                print(f"{user_id},{recipe_id}的收藏关系为{collection}")
+                recipes[idx]['recipe']['collect'] = (lambda c: 1 if c else 0)(collection)
 
 
-            return {"code":10000,"msg":"筛选结果是","data":res}
+
+            return {"code":10000,"msg":"筛选结果是","data":recipes}
         elif location:
             # 时令食谱
             location = json.loads(location)
