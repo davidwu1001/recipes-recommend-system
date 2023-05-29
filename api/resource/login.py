@@ -31,7 +31,7 @@ class Login(Resource):
         user = model.UserModel.query.filter_by(openid=openid).first()
         if user:  # 用户存在 直接返回token
             print("用户已存在")
-            return {"code": 10000, "msg": "注册成功", "data": {"token": token}}
+            return {"code": 10000, "msg": "登录成功", "data": {"token": token}}
         else:  # 用户不存在 创建用户记录
             print("用户不存在")
             try:

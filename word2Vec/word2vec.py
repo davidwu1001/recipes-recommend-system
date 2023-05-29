@@ -2,12 +2,7 @@ import json
 from py2neo import Graph
 from gensim.models import Word2Vec
 import numpy as np
-
-ADDRESS = "bolt://localhost:7   687"
-USERNAME = "neo4j"
-PASSWORD = "11111111w"
-
-graph = Graph(ADDRESS, auth=(USERNAME, PASSWORD))
+from utils.neo4j import graph
 
 
 def process_file(file):
@@ -26,15 +21,15 @@ def process_corpus(file):
     tokenized_corpus = process_file(file)
     # 训练Word2Vec模型
     model = Word2Vec(sentences=tokenized_corpus,
-                     vector_size=20,  # 词向量维数
-                     sg=1,
-                     min_count=1,
-                     workers=10,
-                     epochs=2000,  #
-                     window=5,  # 使模型更关注单词的语义特征
+                     vector_size=15,  # 词向量维数
+                     sg=0,
+                     min_count=3,
+                     workers=20,
+                     epochs=3000,  #
+                     window=6,  # 使模型更关注单词的语义特征
                      )
     # 保存模型
-    model.save("./训练结果/word2vec.model")
+    model.save("./训练结果/word2vec_cbow.model")
 
     return model
 
@@ -78,13 +73,13 @@ def ingredient_recommend_main(model, ingredient, target_num):
             rank[8] = rank[8] + 1
         elif item['sim'] > 0.9:
             rank[9] = rank[9] + 1
-
-    print(ingredients_recommend[0:target_num])
     print(rank)
+
+    print(ingredients_recommend[0: rank[9] + rank[8]])
 
 
 def verify_model(model):
-    name_list = ["带鱼", '红烧肉', '方便面', '蒜蓉辣酱', '挂面', '牛奶', '鱿鱼', '豆腐', '黄瓜', '西兰花', '鸡蛋']
+    name_list = ["五花肉","带鱼", '方便面', '蒜蓉辣酱', '挂面', '牛奶', '鱿鱼', '豆腐', '黄瓜', '西兰花', '鸡蛋']
     for item in name_list:
         ingredient_recommend_main(model, item, 100)
 
@@ -134,9 +129,9 @@ def process_recipe(model):
 
 
 def process_store(vector_recipes):
-    with open("./训练结果/vector_recipes.json", 'w') as f:
+    with open("./训练结果/vector_recipes_cbow.json", 'w') as f:
         json.dump(vector_recipes, f)
-    print("食谱向量保存成功,请在static/json中替换原来的vector_recipes.json文件")
+    print("食谱向量保存成功,请在static/json中替换原来的vector_recipes_cbow.json文件")
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ class IngredientModel(db.Model):
     """
 
     __tablename__ = "ingredient"
-    id = db.Column(db.String(200), primary_key=True)
+    id = db.Column(db.String(200), nullable=False, primary_key=True)
     name = db.Column(db.String(200))
     category = db.Column(db.String(200))
     subcategory = db.Column(db.String(200))

@@ -12,8 +12,8 @@ def process_user(url):
     :param url: 用户主页URL
     :return: user_id || False
     """
-    session.begin()
     try:
+        print("正在爬取",url,'的用户主页')
         userSoup = parse_url(url)
         # 获取user基本信息
         space_info = userSoup.find("div", {"class": 'space_wrap'})
@@ -42,7 +42,7 @@ def process_user(url):
         # 挨个处理recipeUrl
         for recipeUrl in recipeUrlList:
             ingredientIDList = process_recipe(recipeUrl)  # 处理每一个食谱URL 返回对应主料 IDlist
-            print(f"\n{recipeUrl}对应的食材URLLIST 为{ingredientIDList[0:2]}...")
+            print(f"\n{recipeUrl}处理完毕，对应的食材URLLIST 为{ingredientIDList[0:2]}...")
 
             for item in ingredientIDList:
                 # item和user_id添加下单关系
@@ -65,7 +65,17 @@ def process_user(url):
 
 
 
-        print(f"{userID}的主页信息爬取完毕\n\n\n")
+        print(f"{userID} {nickName}的主页信息爬取完毕\n\n\n")
+
+
+        # 收藏记录
+        collections = model.CollectionModel.query.filter_by(user_id=userID)
+        print(collections)
+        print(f"共添加{len(collections)}条收藏记录，详情如下\n{collections}")
+        # 交互记录
+        interactions = model.User_IngredientModel.query.filter_by(user_id=userID)
+        print(f"共添加{len(interactions)}条交互记录，详情如下\n{interactions}")
+
         return userID
     except Exception as e:
         session.rollback()

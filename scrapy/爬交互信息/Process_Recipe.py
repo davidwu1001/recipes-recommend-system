@@ -34,7 +34,7 @@ def process_recipe(url):
     # 获得用户信息
     username = soup.find("span",{"class":"userName"}).text
     user = model.UserModel.query.filter_by(nickName=username).first()
-    print(f"该食谱的用户为{user.nickName}")
+    print(f"\n处理食谱主页{url}\n该食谱的用户为{user.nickName}")
     # user一定存在
     def handleRecipe():
         recipe = {}
@@ -111,9 +111,10 @@ def process_recipe(url):
     print(f"\n食谱信息为{recipe}")
     # database
     res = Insert_neo4j(recipe=recipe, ingredients=ingredient, procedures=procedure)  # neo4j
-
     ingredientIDList = Insert_mysql(recipe=recipe, ingredients=ingredient)  # mysql
 
+
+    print("\n\n现在开始寻找收藏关系")
     # “你可能会喜欢”部分，“收藏”关系
     # case1 专题+食谱
     # case2 纯食谱
@@ -129,39 +130,47 @@ def process_recipe(url):
             recipe_url = item.find("a")['href']
             recipe_name = item.find("p").text
             print(f"发现食谱 {recipe_name}, url为{recipe_url}")
-            # 查询食谱
-            cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name = '{recipe_name}' return i.name as ingredient_id"
+            # 所有食材
+            cypher = f"match (n:Recipe)-[ne:need]->(i:Ingredient) where n.name = '{recipe_name}' return i as ingredient"
             res = graph.run(cypher).data()
             if res:  # 食谱存在
-                print(f"收藏操作时，{recipe['name']}在neo4j中存在, 食材id列表为{res}")
-                ingredientIDList = res
-                for item in ingredientIDList:
+                print(f"收藏操作时，{recipe_name}在neo4j中存在, 食材id列表为{res[0:2]},准备为用户和食材添加收藏关系")
+                for item in res:
+
+                    # 食材在mysql中是否存在
+                    ing = model.IngredientModel.query.filter_by(id=item["ingredient"]['id']).first()
+                    if not ing:  # 存在
+                        ing = model.IngredientModel(id=item["ingredient"]['id'],name=item["ingredient"]['name'])
+                        session.add(ing)
+                        session.commit()
+                        print(f"{item['ingredient']['name']}在mysql中不存在,但是已经创建，id为{item['ingredient']['id']}")
                     # 判断item和user.id之间有无互动关系
-                    item = item['ingredient_id']
-                    print("item=",item,"user_id",user.id)
-                    interaction = model.User_IngredientModel.query.filter_by(user_id=user.id,ingredient_id=item).first()
-                    print("interaction",interaction)
+                    item = item['ingredient']['id']
+
+                    print(f"\n现在开始创建收藏关系")
                     # 创建collection记录
                     collection = model.CollectionModel.query.filter_by(user_id=user.id,recipe_id=recipe['id']).first()
-                    if not collection:  # 收藏记录存在
+                    if not collection:  # 收藏记录不存在
                         collection = model.CollectionModel(user_id=user.id,recipe_id=recipe['id'])
                         session.add(collection)
                         session.commit()
-                        print(f"{user.id},{recipe['id']}collection记录已生成")
+                        print(f"{user.id},{recipe['id']}collection记录不存在，已生成 id为{collection.id}")
                     else:
-                        print(f"{user.id},{recipe['id']}collection记录已存在")
-
+                        print(f"{user.id},{recipe['id']}collection记录已存在,id为{collection.id}")
+                    print(f"\n现在开始添加互动记录")
+                    interaction = model.User_IngredientModel.query.filter_by(user_id=user.id,
+                                                                             ingredient_id=item).first()
                     if interaction:  # 记录存在
-                        print(f"{interaction.user_id}和{interaction.ingredient_id}的记录存在，id为{interaction.id}")
                         # 创建收藏关系
-                        interaction.is_favorite = 1
+                        interaction.collect_count = interaction.collect_count + 1
+                        print(f"{interaction.user_id}和{interaction.ingredient_id}的互动记录存在并已更新，id为{interaction.id}")
                     else:  # 交互记录不存在
-                        interaction = model.User_IngredientModel(user_id=user.id,ingredient_id=item,is_favorite=True)
+                        interaction = model.User_IngredientModel(user_id=user.id,ingredient_id=item,collect_count=1)
                         session.add(interaction)
                         session.commit()
-                        print(f"{interaction.user_id}和{interaction.ingredient_id}的记录不存在，已重新创建，id为{interaction.id}")
-                    print(f"{interaction.user_id}和{interaction.ingredient_id}之间已添加收藏关系")
-
+                        print(f"{interaction.user_id}和{interaction.ingredient_id}的互动记录不存在，已重新创建，id为{interaction.id}")
+            else:
+                print("该食谱在mysql数据库中不存在")
 
 
 
@@ -192,7 +201,7 @@ def Insert_neo4j(recipe,ingredients,procedures):
 
             cypher = f"create (n:Recipe {{id:'{generate_ID()}',name:'{_escape(recipe['name'])}',picture:'{picture}',time_consuming:'{time_consuming}',process:'{process}',category:{str(recipe['category'])},text:'{_escape(recipe['text'])}' }}) return n.id as id"
             recipe_id = tx.run(cypher).evaluate("id")
-            print(f"\n{recipe['name']}不存在，已重新创建记录，id={recipe_id}")
+            print(f"\n在neo4j中{recipe['name']}不存在，已重新创建记录，id={recipe_id}\n")
 
 
         for ingredient in ingredients:
@@ -243,6 +252,7 @@ def Insert_mysql(recipe,ingredients):
         recipe_id = graph.run(cypher).data()[0]['id']
         recipe['id'] = recipe_id
 
+        print(f"\n现在将{recipe['name']}插入到mysql")
         # 判断食谱在mysql是否存在
         _recipe = model.RecipeModel.query.filter_by(name=recipe['name']).first()
         if not _recipe:  # 食谱不存在
@@ -250,9 +260,9 @@ def Insert_mysql(recipe,ingredients):
             _recipe = model.RecipeModel(id=recipe['id'],name=_escape(recipe['name']),picture=recipe['picture'],category=recipe['category'],process=recipe['process'],text=_escape(recipe['text']),time_consuming=recipe['time_consuming'])
             session.add(_recipe)
             session.commit()
-            print(f"\n{recipe['name']}在mysql中不存在，已重新创建记录，id是{_recipe.id}")
+            print(f"{recipe['name']}在mysql中不存在，已重新创建记录，id是{_recipe.id}]\n")
         else:
-            print(f"\n{recipe['name']}在mysql中已存在，id={recipe['id']}")
+            print(f"{recipe['name']}在mysql中已存在，id={recipe['id']}\n")
 
 
         ingredientIDList = []
@@ -260,19 +270,19 @@ def Insert_mysql(recipe,ingredients):
         for item in ingredients:
             ingredient = model.IngredientModel.query.filter_by(name=item['name']).first()
             if not ingredient:
-                ingredient = model.IngredientModel(name=item['name'])
+                ingredient = model.IngredientModel(id=generate_ID(),name=item['name'])
                 session.add(ingredient)
                 session.commit()
-                print(f"{ingredient.name}不存在，已重新创建记录,id={ingredient.id}")
+                print(f"{ingredient.name}在mysql中不存在，已重新创建记录,id={ingredient.id}")
             else:
-                print(f"{ingredient.name}已存在,id={ingredient.id}")
+                print(f"{ingredient.name}在mysql中已存在,id={ingredient.id}")
             # 将新添加的食材id加入list
             ingredientIDList.append(ingredient.id)
 
         session.commit()
 
         num = model.RecipeModel.query.count()
-        print(f"mysql recipe当前{num}个")
+        print(f"\n\nmysql recipe当前{num}个")
 
         return ingredientIDList
     except Exception as e:
